@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""
+ERS to GeoTIFF Converter
+
+A simple tool to convert ERMapper (.ers) files to GeoTIFF format
+while preserving spatial information and data precision.
+
+Author: Your Name
+License: MIT
+"""
+
+import os
+import sys
+import argparse
+import logging
+from pathlib import Path
+
+try:
+    import rasterio
+    import numpy as np
+except ImportError as e:
+    print(f"Error: Required package not found - {e}")
+    print("Please install required packages: pip install rasterio numpy")
+    sys.exit(1)
+
+__version__ = "1.0.0"
+
+def setup_logging(verbose=False):
+    """Setup logging configuration"""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format='%(levelname)s: %(message)s'
+    )
+
+def convert_ers_to_geotiff(ers_path, output_path=None, overwrite=False):
+    """
+    Convert ERS file to GeoTIFF format
+    
+    Args:
+        ers_path (str): Path to input ERS file
+        output_path (str, optional): Path for output GeoTIFF. If None, uses same name with .tif extension
+        overwrite (bool): Whether to overwrite existing output file
+        
+    Returns:
+        str: Path to output file if successful, None if failed
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Validate input file
+    ers_path = Path(ers_path)
+    if not ers_path.exists():
+        logger.error(f"Input file does not exist: {ers_path}")
+        return None
+    
+    if not ers_path.suffix.lower() in ['.ers']:
+        logger.warning(f"Input file may not be ERS format: {ers_path}")
+    
+    # Determine output path
+    if output_path is None:
+        output_path = ers_path.with_suffix('.tif')
+    else:
+        output_path = Path(output_path)
+    
+    # Check if output exists
+    if output_path.exists() and not overwrite:
+        logger.error(f"Output file exists: {output_path}. Use --overwrite to replace.")
+        return None
+    
+    try:
+        logger.info(f"Converting: {ers_path.name}")
+        
+        with rasterio.open(ers_path) as src:
+            # Log input file information
+            logger.info(f"Input details:")
+            logger.info(f"  Size: {src.width} x {src.height}")
+            logger.info(f"  Bands: {src.count}")
+            logger.info(f"  Data type: {src.dtypes[0]}")
+            logger.info(f"  CRS: {src.crs}")
+            logger.info(f"  Driver: {src.driver}")
+            
+            # Read data (handle both single and multi-band)
+            if src.count == 1:
+                data = src.read(1, masked=True)
+                logger.debug("Read single-band data")
+            else:
+                data = src.read(masked=True)
+                logger.debug(f"Read {src.count}-band data")
+            
+            # Prepare output profile
+            profile = src.profile.copy()
+            profile.update({
+                'driver': 'GTiff',
+                'dtype': 'float32',
+                'compress': 'lzw',
+                'tiled': True,
+                'blockxsize': 512,
+                'blockysize': 512
+            })
+            
+            # Handle no-data values
+            if src.nodata is not None:
+                profile['nodata'] = np.nan
+            
+            # Write output file
+            with rasterio.open(output_path, 'w', **profile) as dst:
+                if src.count == 1:
+                    # Single band
+                    output_data = data.filled(np.nan).astype(np.float32)
+                    dst.write(output_data, 1)
+                else:
+                    # Multi-band
+                    for i in range(src.count):
+                        band_data = data[i].filled(np.nan).astype(np.float32)
+                        dst.write(band_data, i + 1)
+                
+                # Copy metadata
+                dst.update_tags(**src.tags())
+                
+                # Copy band descriptions if available
+                for i in range(src.count):
+                    if src.descriptions[i]:
+                        dst.set_band_description(i + 1, src.descriptions[i])
+            
+            # Log data statistics
+            if src.count == 1:
+                valid_data = data.compressed()
+                if len(valid_data) > 0:
+                    logger.info(f"Data statistics:")
+                    logger.info(f"  Range: {valid_data.min():.3f} to {valid_data.max():.3f}")
+                    logger.info(f"  Valid pixels: {len(valid_data):,}")
+                    logger.info(f"  No-data pixels: {data.mask.sum():,}")
+                else:
+                    logger.warning("No valid data found in file")
+            else:
+                total_valid = 0
+                for i in range(src.count):
+                    valid_count = np.sum(~data[i].mask)
+                    total_valid += valid_count
+                    logger.debug(f"  Band {i+1}: {valid_count:,} valid pixels")
+                logger.info(f"Total valid pixels across all bands: {total_valid:,}")
+            
+        logger.info(f"Output saved: {output_path}")
+        logger.info(f"Conversion completed successfully")
+        
+        return str(output_path)
+        
+    except Exception as e:
+        logger.error(f"Conversion failed: {e}")
+        return None
+
+def main():
+    """Main command line interface"""
+    parser = argparse.ArgumentParser(
+        description="Convert ERMapper (.ers) files to GeoTIFF format",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s input.ers                    # Convert to input.tif
+  %(prog)s input.ers -o output.tif      # Specify output name
+  %(prog)s *.ers --overwrite            # Convert multiple files
+  %(prog)s input.ers -v                 # Verbose output
+        """
+    )
+    
+    parser.add_argument(
+        'input_files',
+        nargs='+',
+        help='Input ERS file(s) to convert'
+    )
+    
+    parser.add_argument(
+        '-o', '--output',
+        help='Output GeoTIFF file path (only for single input file)'
+    )
+    
+    parser.add_argument(
+        '--overwrite',
+        action='store_true',
+        help='Overwrite existing output files'
+    )
+    
+    parser.add_argument(
+        '-v', '--verbose',
+        action='store_true',
+        help='Enable verbose output'
+    )
+    
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {__version__}'
+    )
+    
+    args = parser.parse_args()
+    
+    # Setup logging
+    setup_logging(args.verbose)
+    logger = logging.getLogger(__name__)
+    
+    # Validate arguments
+    if len(args.input_files) > 1 and args.output:
+        logger.error("Cannot specify output file when converting multiple files")
+        sys.exit(1)
+    
+    # Process files
+    success_count = 0
+    total_count = len(args.input_files)
+    
+    for input_file in args.input_files:
+        logger.info(f"Processing {input_file}")
+        
+        result = convert_ers_to_geotiff(
+            ers_path=input_file,
+            output_path=args.output,
+            overwrite=args.overwrite
+        )
+        
+        if result:
+            success_count += 1
+        else:
+            logger.error(f"Failed to convert {input_file}")
+    
+    # Summary
+    logger.info(f"Conversion complete: {success_count}/{total_count} files successful")
+    
+    if success_count < total_count:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
