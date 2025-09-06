@@ -80,13 +80,16 @@ def convert_ers_to_geotiff(ers_path, output_path=None):
 
 def main():
     """Simple command line usage"""
-    if len(sys.argv) < 2:
-        print("Usage: python ers_converter.py input.ers [output.tif]")
-        print("Example: python ers_converter.py data.ers")
+    if len(sys.argv) != 2:
+        print("Usage: python ers_converter.py input.ers")
+        print("Example: python ers_converter.py my_data.ers")
+        print("Output will be saved as input.tif")
         sys.exit(1)
     
     input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    
+    # Auto-generate output filename (same name, .tif extension)
+    output_file = os.path.splitext(input_file)[0] + ".tif"
     
     result = convert_ers_to_geotiff(input_file, output_file)
     
