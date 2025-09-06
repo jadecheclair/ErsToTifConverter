@@ -12,37 +12,32 @@ Converts ERMapper files to standard GeoTIFF format while preserving:
 - Metadata and attributes
 - Single or multi-band data
 
-## Installation
+## Getting Started
 
+### Step 1: Download this tool
+- Click the green "Code" button above, then "Download ZIP"
+- Extract the ZIP file to your computer
+- You'll need the file called `ers_converter.py`
+
+### Step 2: Install Python requirements
 You need Python with these packages:
 
 ```bash
 pip install rasterio numpy
 ```
 
-## Usage
-
-Simple one-line conversion:
-
-```bash
-python ers_converter.py input_file.ers
-```
-
-This creates `input_file.tif` in the same directory.
-
-### Examples
+### Step 3: Convert your ERS file
+Open your terminal/command prompt and navigate to where you saved `ers_converter.py`, then run:
 
 ```bash
-python ers_converter.py uranium_survey.ers
-# Creates: uranium_survey.tif
-
-python ers_converter.py magnetic_data.ers  
-# Creates: magnetic_data.tif
+python ers_converter.py YOUR_ACTUAL_FILENAME.ers
 ```
+
+**Important:** Replace `YOUR_ACTUAL_FILENAME.ers` with the real name of your ERS file!
 
 ## What you get
 
-- **Same filename** with .tif extension
+- **Same filename** with .tif extension instead of .ers
 - **32-bit floating point** precision (no data loss)
 - **LZW compression** (smaller file size)
 - **Proper no-data handling** (NaN values)
@@ -50,9 +45,9 @@ python ers_converter.py magnetic_data.ers
 
 ## Requirements
 
-- Python 3.7+
-- rasterio
-- numpy
+- Python 3.7 or newer
+- rasterio package
+- numpy package
 
 ## Why use this?
 
@@ -72,9 +67,14 @@ ERMapper files (.ers) aren't supported by many modern GIS tools. This converter 
 
 ## Troubleshooting
 
+**"Usage: python ers_converter.py input.ers"**
+- You forgot to specify your ERS file name
+- Make sure to replace `input.ers` with your actual file name
+
 **"File not found"**
 - Check the file path and spelling
-- Make sure the .ers file exists
+- Make sure the .ers file exists in the same folder as the Python script
+- Or provide the full path to your ERS file
 
 **"Required package not found"**
 - Install dependencies: `pip install rasterio numpy`
@@ -82,6 +82,17 @@ ERMapper files (.ers) aren't supported by many modern GIS tools. This converter 
 **"Conversion failed"**
 - Check if the ERS file is corrupted
 - Ensure you have write permissions in the output directory
+
+## For non-technical users
+
+Don't worry if you're not familiar with programming! Here's the simple process:
+
+1. Download this tool (the `ers_converter.py` file)
+2. Install Python and the required packages
+3. Put your ERS file in the same folder as the Python script
+4. Open terminal/command prompt in that folder
+5. Type: `python ers_converter.py` followed by your ERS file name
+6. Press Enter and wait for "Conversion completed successfully"
 
 ## Technical details
 
